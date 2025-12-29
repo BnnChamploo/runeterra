@@ -1,6 +1,9 @@
 // 统一配置管理
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const UPLOAD_BASE_URL = import.meta.env.VITE_UPLOAD_BASE_URL || (API_BASE_URL ? `${API_BASE_URL}/uploads` : '/uploads');
+// 生产环境默认使用 Fly.io 后端
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD ? 'https://runeterra-api.fly.dev' : '');
+const UPLOAD_BASE_URL = import.meta.env.VITE_UPLOAD_BASE_URL || 
+  (API_BASE_URL ? `${API_BASE_URL}/uploads` : '/uploads');
 
 // 获取上传文件的完整URL
 export function getUploadUrl(path) {

@@ -1,36 +1,47 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const bcrypt = require('bcrypt');
+const sqlite3 = require('sqlite3').verbose();
+const bcrypt = require('bcryptjs');
+const { promisify } = require('util');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+
+// 将 bcryptjs 的异步方法转换为 Promise
+const bcryptHash = promisify(bcrypt.hash);
+const bcryptCompare = promisify(bcrypt.compare);
 const heroes = require('./heroes');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'runeterra-secret-key-change-in-production';
+const PORT = 3001;
+const JWT_SECRET = 'runeterra-secret-key-change-in-production';
+
+// 配置上传文件路径（Fly.io 使用持久化存储）
+const uploadsBasePath = process.env.FLY_VOLUME_PATH 
+  ? `${process.env.FLY_VOLUME_PATH}/uploads`
+  : 'uploads';
 
 // 中间件
-// CORS 配置：允许 GitHub Pages 和其他前端域名
+// CORS 配置：允许 GitHub Pages 和本地开发
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
   process.env.FRONTEND_URL,
-  process.env.GITHUB_PAGES_URL
-].filter(Boolean); // 过滤掉 undefined
+  process.env.GITHUB_PAGES_URL,
+  'http://localhost:3000',
+  'http://localhost:5173'
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // 允许没有 origin 的请求（如移动应用、Postman）
+    // 允许没有 origin 的请求（如移动应用或 Postman）
     if (!origin) return callback(null, true);
-    // 允许所有配置的域名
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    // 允许配置的域名
+    if (allowedOrigins.includes(origin) || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
       callback(null, true);
     } else {
-      // 开发环境允许所有来源，生产环境只允许配置的域名
+      // 开发环境允许所有来源
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
       } else {
@@ -42,12 +53,6 @@ app.use(cors({
 }));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
-
-// Fly.io 使用持久化存储，上传目录在 /app/data/uploads
-const uploadsBasePath = process.env.FLY_VOLUME_PATH 
-  ? `${process.env.FLY_VOLUME_PATH}/uploads`
-  : 'uploads';
-
 app.use('/uploads', express.static(uploadsBasePath));
 
 // 确保上传目录存在
@@ -263,10 +268,10 @@ const REGIONS = [
 
 // 初始化数据库
 // Fly.io 使用持久化存储，数据库路径在 /app/data/runeterra.db
-const sqlite3 = require('sqlite3').verbose();
 const dbPath = process.env.FLY_VOLUME_PATH 
   ? `${process.env.FLY_VOLUME_PATH}/runeterra.db`
   : 'runeterra.db';
+console.log(`数据库路径: ${dbPath}`);
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
@@ -457,7 +462,7 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcryptHash(password, 10);
     db.run('INSERT INTO users (username, password) VALUES (?, ?)', 
       [username, hashedPassword], function(err) {
       if (err) {
@@ -499,7 +504,7 @@ app.post('/api/login', (req, res) => {
     }
 
     try {
-      const valid = await bcrypt.compare(password, user.password);
+      const valid = await bcryptCompare(password, user.password);
       if (!valid) {
         return res.status(401).json({ error: '用户名或密码错误' });
       }
@@ -1097,6 +1102,45 @@ app.get('/api/categories/all', (req, res) => {
 // 获取地区列表
 app.get('/api/regions', (req, res) => {
   res.json(REGIONS);
+});
+
+// ============================================
+// 临时数据上传端点（上传完成后记得删除）
+// ============================================
+const { exec } = require('child_process');
+const execAsync = promisify(exec);
+
+app.post('/api/admin/upload-data', multer({ 
+  dest: '/app/data/',
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB 限制
+}).single('datafile'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: '没有上传文件' });
+  }
+
+  const uploadedFile = req.file.path;
+  const targetDir = '/app/data';
+
+  try {
+    // 解压数据包
+    console.log(`开始解压数据包: ${uploadedFile}`);
+    const { stdout, stderr } = await execAsync(`cd ${targetDir} && tar -xzf ${uploadedFile} && rm ${uploadedFile}`);
+    
+    if (stderr && !stderr.includes('Removing leading')) {
+      console.error('解压警告:', stderr);
+    }
+    
+    console.log('数据解压成功');
+    res.json({ 
+      message: '数据上传并解压成功',
+      extracted: true
+    });
+  } catch (error) {
+    console.error('解压失败:', error);
+    res.status(500).json({ 
+      error: '解压失败: ' + error.message 
+    });
+  }
 });
 
 app.listen(PORT, () => {
