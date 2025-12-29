@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>班德尔密林 - 符文大陆里宇宙</title>
+    <script>
+      // GitHub Pages 404 重定向到首页
+      // 让 React Router 处理路由
+      sessionStorage.redirect = location.pathname;
+      location.replace(location.pathname.split('/').slice(0, -1).join('/') + '/' + location.search + location.hash);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+

@@ -1,0 +1,26 @@
+# Fly.io Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 安装构建工具（用于编译原生模块）
+RUN apk add --no-cache python3 make g++
+
+# 复制 package.json 和 package-lock.json
+COPY package*.json ./
+
+# 安装依赖（在容器内重新编译原生模块）
+RUN npm install --production
+
+# 复制应用代码
+COPY . .
+
+# 创建数据目录（用于 SQLite 数据库和上传文件）
+RUN mkdir -p /app/data /app/uploads
+
+# 暴露端口
+EXPOSE 3001
+
+# 启动应用
+CMD ["node", "index.js"]
+

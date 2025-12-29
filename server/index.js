@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
@@ -11,30 +10,61 @@ const { v4: uuidv4 } = require('uuid');
 const heroes = require('./heroes');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'runeterra-secret-key-change-in-production';
 
 // 中间件
-app.use(cors());
+// CORS 配置：允许 GitHub Pages 和其他前端域名
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  process.env.FRONTEND_URL,
+  process.env.GITHUB_PAGES_URL
+].filter(Boolean); // 过滤掉 undefined
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // 允许没有 origin 的请求（如移动应用、Postman）
+    if (!origin) return callback(null, true);
+    // 允许所有配置的域名
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // 开发环境允许所有来源，生产环境只允许配置的域名
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true
+}));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
-app.use('/uploads', express.static('uploads'));
+
+// Fly.io 使用持久化存储，上传目录在 /app/data/uploads
+const uploadsBasePath = process.env.FLY_VOLUME_PATH 
+  ? `${process.env.FLY_VOLUME_PATH}/uploads`
+  : 'uploads';
+
+app.use('/uploads', express.static(uploadsBasePath));
 
 // 确保上传目录存在
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
+if (!fs.existsSync(uploadsBasePath)) {
+  fs.mkdirSync(uploadsBasePath, { recursive: true });
 }
-if (!fs.existsSync('uploads/avatars')) {
-  fs.mkdirSync('uploads/avatars', { recursive: true });
+if (!fs.existsSync(`${uploadsBasePath}/avatars`)) {
+  fs.mkdirSync(`${uploadsBasePath}/avatars`, { recursive: true });
 }
-if (!fs.existsSync('uploads/posts')) {
-  fs.mkdirSync('uploads/posts', { recursive: true });
+if (!fs.existsSync(`${uploadsBasePath}/posts`)) {
+  fs.mkdirSync(`${uploadsBasePath}/posts`, { recursive: true });
 }
 
 // 配置文件上传 - 头像
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/avatars/');
+    cb(null, `${uploadsBasePath}/avatars/`);
   },
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
@@ -45,7 +75,7 @@ const avatarStorage = multer.diskStorage({
 // 配置文件上传 - 帖子/回复图片
 const postImageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/posts/');
+    cb(null, `${uploadsBasePath}/posts/`);
   },
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
@@ -232,7 +262,12 @@ const REGIONS = [
 ];
 
 // 初始化数据库
-const db = new sqlite3.Database('runeterra.db');
+// Fly.io 使用持久化存储，数据库路径在 /app/data/runeterra.db
+const sqlite3 = require('sqlite3').verbose();
+const dbPath = process.env.FLY_VOLUME_PATH 
+  ? `${process.env.FLY_VOLUME_PATH}/runeterra.db`
+  : 'runeterra.db';
+const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
   // 用户表 - 添加头衔、身份、段位/外号（段位用于召唤师，外号用于英雄）

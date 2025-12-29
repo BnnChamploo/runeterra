@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { getApiBaseUrl } from './config';
 
-const API_BASE_URL = '/api';
+// 使用环境变量配置的 API URL，如果没有配置则使用相对路径（开发环境）
+const API_BASE_URL = getApiBaseUrl() || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

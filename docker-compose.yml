@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: runeterra-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+    volumes:
+      - ./server/uploads:/app/uploads
+      - ./server/runeterra.db:/app/runeterra.db
+    restart: unless-stopped
+    networks:
+      - runeterra-network
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: runeterra-frontend
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - runeterra-network
+
+networks:
+  runeterra-network:
+    driver: bridge
+

@@ -61,7 +61,7 @@ function App() {
 
   return (
     <ThemeProvider>
-      <Router>
+      <Router basename="/runeterra">
         <div className="min-h-screen theme-bg">
           <Navbar user={user} onLogout={handleLogout} />
           <Routes>
