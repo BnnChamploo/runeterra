@@ -37,17 +37,26 @@ if (process.env.NODE_ENV === 'production') {
     process.env.FRONTEND_URL,
     process.env.GITHUB_PAGES_URL,
     'https://BnnChamploo.github.io',
-    'https://BnnChamploo.github.io/runeterra'
+    'https://bnnchamploo.github.io'  // 小写版本
   ].filter(Boolean);
   
   app.use(cors({
     origin: function (origin, callback) {
-      // 允许没有 origin 的请求
+      // 允许没有 origin 的请求（某些情况下可能没有 origin）
       if (!origin) return callback(null, true);
-      // 允许配置的域名
-      if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
+      
+      // 检查是否是允许的域名（忽略路径部分）
+      const originHost = origin.replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (!allowed) return false;
+        const allowedHost = allowed.replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
+        return originHost === allowedHost || originHost.endsWith('.' + allowedHost);
+      });
+      
+      if (isAllowed) {
         callback(null, true);
       } else {
+        console.log('CORS blocked:', origin, 'Allowed:', allowedOrigins);
         callback(new Error('Not allowed by CORS'));
       }
     },
