@@ -1,14 +1,21 @@
 // 统一配置管理
 // 生产环境默认使用 Fly.io 后端
-// 判断是否为生产环境：明确检查是否是 GitHub Pages 域名
+// 判断是否为生产环境：
+// 1. Vite 构建时 import.meta.env.PROD 为 true
+// 2. 运行时检查是否是 GitHub Pages 域名
 const isProduction = import.meta.env.PROD || 
   (typeof window !== 'undefined' && 
    (window.location.hostname === 'bnnchamploo.github.io' || 
     window.location.hostname.includes('github.io')));
 
 // 生产环境强制使用 Fly.io 后端
+// 如果明确设置了 VITE_API_URL，使用它；否则在生产环境使用 Fly.io
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (isProduction ? 'https://runeterra-api.fly.dev' : '');
+  (import.meta.env.PROD ? 'https://runeterra-api.fly.dev' : 
+   (typeof window !== 'undefined' && 
+    (window.location.hostname === 'bnnchamploo.github.io' || 
+     window.location.hostname.includes('github.io')) 
+    ? 'https://runeterra-api.fly.dev' : ''));
 const UPLOAD_BASE_URL = import.meta.env.VITE_UPLOAD_BASE_URL || 
   (API_BASE_URL ? `${API_BASE_URL}/uploads` : '/uploads');
 

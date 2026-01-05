@@ -226,7 +226,7 @@ function getDefaultAvatarUrls(username) {
  * @param {string} username - 用户名（用于查找默认头像）
  * @returns {string} 头像URL
  */
-import { getUploadUrl } from './config';
+import { getUploadUrl, getApiBaseUrl } from './config';
 
 export function getAvatarUrl(avatar, username) {
   // 如果数据库中有头像且不是默认头像，使用数据库中的头像
