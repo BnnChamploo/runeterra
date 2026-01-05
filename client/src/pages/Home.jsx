@@ -144,9 +144,9 @@ const Home = () => {
             <Link
               key={post.id}
               to={`/post/${post.id}`}
-              className="block theme-card rounded-lg p-4 md:p-6 transition-colors border border-runeterra-gold/20 hover:border-runeterra-gold/40"
+              className="block w-full theme-card rounded-lg p-4 md:p-6 transition-colors border border-runeterra-gold/20 hover:border-runeterra-gold/40"
             >
-              <div className="flex-1">
+              <div className="w-full">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   {post.is_pinned === 1 && (
                     <span className="px-2 py-1 bg-runeterra-gold text-runeterra-dark rounded text-xs font-bold flex-shrink-0 whitespace-nowrap">
