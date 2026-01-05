@@ -487,7 +487,8 @@ const PostDetail = ({ user }) => {
   const [categoryMap, setCategoryMap] = useState({});
 
   useEffect(() => {
-    fetch('/api/categories/all')
+    const { getApiUrl } = require('../utils/config');
+    fetch(getApiUrl('/categories/all'))
       .then(res => res.json())
       .then(data => {
         const map = {};

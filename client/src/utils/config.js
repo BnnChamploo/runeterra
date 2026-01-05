@@ -33,10 +33,23 @@ export function getApiBaseUrl() {
   return API_BASE_URL || '';
 }
 
+// 获取完整的API URL（用于 fetch 调用）
+export function getApiUrl(path) {
+  const base = getApiBaseUrl();
+  // 如果 path 已经以 /api 开头，直接拼接
+  if (path.startsWith('/api')) {
+    return base ? `${base}${path}` : path;
+  }
+  // 否则添加 /api 前缀
+  const apiPath = path.startsWith('/') ? `/api${path}` : `/api/${path}`;
+  return base ? `${base}${apiPath}` : apiPath;
+}
+
 export default {
   API_BASE_URL,
   UPLOAD_BASE_URL,
   getUploadUrl,
-  getApiBaseUrl
+  getApiBaseUrl,
+  getApiUrl
 };
 

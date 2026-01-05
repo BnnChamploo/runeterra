@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getAvatarUrl, createAvatarErrorHandler } from '../utils/avatar';
+import { getApiUrl } from '../utils/config';
 
 const Navbar = ({ user, onLogout }) => {
   const location = useLocation();
@@ -19,8 +20,9 @@ const Navbar = ({ user, onLogout }) => {
 
   useEffect(() => {
     // 获取主板块（包含子板块信息）
-    fetch('/api/categories')
-      .then(res => res.json())
+    import('../utils/config').then(({ getApiUrl }) => {
+      fetch(getApiUrl('/categories'))
+        .then(res => res.json())
       .then(mainData => {
         const cats = [];
         Object.keys(mainData).forEach(key => {
