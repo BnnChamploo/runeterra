@@ -254,6 +254,7 @@ export function getAvatarUrl(avatar, username) {
  */
 export function createAvatarErrorHandler(username, initialAvatar) {
   const defaultUrls = getDefaultAvatarUrls(username);
+  const API_BASE_URL = getApiBaseUrl();
   
   return function handleError(e) {
     const img = e.target;
@@ -290,8 +291,12 @@ export function createAvatarErrorHandler(username, initialAvatar) {
       }
     }
     
-    // 如果初始头像是默认头像路径（/avatar/开头），找到当前URL在列表中的位置
-    if (initialAvatar && initialAvatar.startsWith('/avatar/') && currentIndex === -1) {
+    // 如果初始头像是默认头像路径（/avatar/开头或包含/avatars/），找到当前URL在列表中的位置
+    const isDefaultAvatarPath = initialAvatar && (
+      initialAvatar.startsWith('/avatar/') || 
+      (API_BASE_URL && initialAvatar.includes('/avatars/'))
+    );
+    if (isDefaultAvatarPath && currentIndex === -1) {
       const initialIndex = defaultUrls.indexOf(initialAvatar);
       if (initialIndex >= 0 && initialIndex < defaultUrls.length - 1) {
         currentIndex = initialIndex + 1;
