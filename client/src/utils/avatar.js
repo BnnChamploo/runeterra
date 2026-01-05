@@ -204,9 +204,16 @@ function getDefaultAvatarUrls(username) {
   const names = getPossibleAvatarNames(username);
   const urls = [];
   
+  // 在生产环境，默认头像应该从后端服务器获取
+  // 在开发环境，使用相对路径（指向 public/avatar/）
+  const API_BASE_URL = getApiBaseUrl();
+  const avatarBasePath = API_BASE_URL 
+    ? `${API_BASE_URL}/uploads/avatars`  // 生产环境：从后端获取
+    : '/avatar';  // 开发环境：从 public/avatar/ 获取
+  
   for (const name of names) {
     for (const ext of IMAGE_EXTENSIONS) {
-      urls.push(`/avatar/${name}.${ext}`);
+      urls.push(`${avatarBasePath}/${name}.${ext}`);
     }
   }
   
@@ -231,7 +238,11 @@ export function getAvatarUrl(avatar, username) {
   const defaultUrls = getDefaultAvatarUrls(username);
   // 返回第一个可能的URL，让浏览器尝试加载
   // 如果第一个失败，会在 onError 中处理
-  return defaultUrls[0] || '/avatar/default.jpg';
+  const API_BASE_URL = getApiBaseUrl();
+  const defaultFallback = API_BASE_URL 
+    ? `${API_BASE_URL}/uploads/avatars/default.jpg`
+    : '/avatar/default.jpg';
+  return defaultUrls[0] || defaultFallback;
 }
 
 /**
