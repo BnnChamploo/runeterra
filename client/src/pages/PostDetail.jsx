@@ -10,7 +10,7 @@ import { formatRuneterraTime } from '../utils/runeterraTime';
 import { getAvatarUrl, createAvatarErrorHandler } from '../utils/avatar';
 import { highlightMentionsSimple } from '../utils/highlightMentions';
 import SearchableSelect from '../components/SearchableSelect';
-import { getUploadUrl } from '../utils/config';
+import { getUploadUrl, getApiUrl } from '../utils/config';
 
 // 可拖拽的回复项组件
 const SortableReplyItem = ({ reply, index, isEditMode, onEdit, onDelete, users, regions, onUsersUpdate, customUsername, useCustomUsername, onCustomUsernameChange, onUseCustomUsernameChange, postUserId }) => {
@@ -487,7 +487,6 @@ const PostDetail = ({ user }) => {
   const [categoryMap, setCategoryMap] = useState({});
 
   useEffect(() => {
-    const { getApiUrl } = require('../utils/config');
     fetch(getApiUrl('/categories/all'))
       .then(res => res.json())
       .then(data => {

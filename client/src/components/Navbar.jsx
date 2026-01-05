@@ -20,9 +20,8 @@ const Navbar = ({ user, onLogout }) => {
 
   useEffect(() => {
     // 获取主板块（包含子板块信息）
-    import('../utils/config').then(({ getApiUrl }) => {
-      fetch(getApiUrl('/categories'))
-        .then(res => res.json())
+    fetch(getApiUrl('/categories'))
+      .then(res => res.json())
       .then(mainData => {
         const cats = [];
         Object.keys(mainData).forEach(key => {
@@ -198,7 +197,7 @@ const Navbar = ({ user, onLogout }) => {
                         if (confirm('确定要清除所有帖子吗？此操作不可恢复！')) {
                           try {
                             const token = localStorage.getItem('token');
-                            const response = await fetch('/api/posts/all', {
+                            const response = await fetch(getApiUrl('/posts/all'), {
                               method: 'DELETE',
                               headers: {
                                 'Authorization': `Bearer ${token}`,

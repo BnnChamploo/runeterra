@@ -36,7 +36,6 @@ const CreatePost = ({ user }) => {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    const { getApiUrl } = require('../utils/config');
     fetch(getApiUrl('/categories/all'))
       .then(res => res.json())
       .then(data => {
@@ -62,7 +61,6 @@ const CreatePost = ({ user }) => {
   useEffect(() => {
     fetchUsers();
     fetchRegions();
-    const { getApiUrl } = require('../utils/config');
     fetch(getApiUrl('/categories/all'))
       .then(res => res.json())
       .then(data => {
