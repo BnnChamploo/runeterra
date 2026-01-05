@@ -15,7 +15,7 @@ const Login = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await api.post('/login', { username, password });
+      const response = await api.post('/api/login', { username, password });
       onLogin(response.data.user, response.data.token);
       navigate('/');
     } catch (err) {

@@ -1,23 +1,33 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './config';
 
-// 使用环境变量配置的 API URL，如果没有配置则使用相对路径（开发环境）
-const API_BASE_URL = getApiBaseUrl() || '/api';
+// 使用环境变量配置的 API URL
+// 如果配置了完整 URL（生产环境），baseURL 就是完整 URL，所有请求路径需要包含 /api
+// 如果没有配置（开发环境），baseURL 是 /api，请求路径不需要 /api 前缀
+const API_BASE_URL = getApiBaseUrl();
+const baseURL = API_BASE_URL || '/api';
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// 请求拦截器：添加token
+// 请求拦截器：统一处理路径和添加token
 api.interceptors.request.use(
   (config) => {
+    // 如果 baseURL 是完整 URL（生产环境）且路径不以 /api 开头，自动添加
+    if (API_BASE_URL && !config.url.startsWith('/api') && !config.url.startsWith('http')) {
+      config.url = '/api' + (config.url.startsWith('/') ? config.url : '/' + config.url);
+    }
+    
+    // 添加token
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
     return config;
   },
   (error) => {

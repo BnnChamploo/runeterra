@@ -27,7 +27,7 @@ const Register = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await api.post('/register', { username, password });
+      const response = await api.post('/api/register', { username, password });
       onLogin(response.data.user, response.data.token);
       navigate('/');
     } catch (err) {
