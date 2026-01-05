@@ -9,20 +9,26 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const heroes = require('./heroes');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'runeterra-secret-key-change-in-production';
 
 // 将 bcryptjs 的异步方法转换为 Promise
 const bcryptHash = promisify(bcrypt.hash);
 const bcryptCompare = promisify(bcrypt.compare);
-const heroes = require('./heroes');
 
-const app = express();
-const PORT = 3001;
-const JWT_SECRET = 'runeterra-secret-key-change-in-production';
-
-// 配置上传文件路径（Fly.io 使用持久化存储）
+// 配置路径（Fly.io 使用持久化存储，本地使用当前目录）
+const dataDir = process.env.FLY_VOLUME_PATH || './data';
 const uploadsBasePath = process.env.FLY_VOLUME_PATH 
   ? `${process.env.FLY_VOLUME_PATH}/uploads`
   : 'uploads';
+
+// 确保数据目录存在
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
 
 // 中间件
 // CORS 配置：开发环境允许所有来源，生产环境只允许配置的域名
@@ -309,7 +315,7 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`);
 
-  // 回复表 - 添加图片、匿名、自定义时间、地区、头衔、身份、排序、段位、楼层数
+  // 回复表 - 添加图片、匿名、自定义时间、地区、头衔、身份、排序、段位、楼层数、父回复ID
   db.run(`CREATE TABLE IF NOT EXISTS replies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL,
@@ -323,11 +329,13 @@ db.serialize(() => {
     user_identity TEXT DEFAULT '',
     user_rank TEXT DEFAULT '',
     floor_number INTEGER DEFAULT NULL,
+    parent_reply_id INTEGER DEFAULT NULL,
     likes INTEGER DEFAULT 0,
     sort_order INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (parent_reply_id) REFERENCES replies(id)
   )`);
 
   // 点赞表
@@ -372,6 +380,7 @@ db.serialize(() => {
   addColumnIfNotExists('replies', 'user_identity', 'TEXT DEFAULT \'\'');
   addColumnIfNotExists('replies', 'user_rank', 'TEXT DEFAULT \'\'');
   addColumnIfNotExists('replies', 'floor_number', 'INTEGER DEFAULT NULL');
+  addColumnIfNotExists('replies', 'parent_reply_id', 'INTEGER DEFAULT NULL');
   addColumnIfNotExists('replies', 'likes', 'INTEGER DEFAULT 0');
   addColumnIfNotExists('replies', 'sort_order', 'INTEGER DEFAULT 0');
 
@@ -384,19 +393,14 @@ db.serialize(() => {
     
     if (result.count === 0) {
       console.log('开始导入英雄数据...');
-      bcrypt.hash('1234567', 10, (err, defaultPassword) => {
-        if (err) {
-          console.error('生成默认密码失败:', err);
-          return;
-        }
-        
+      bcryptHash('1234567', 10).then(defaultPassword => {
         let inserted = 0;
         let completed = 0;
         
         heroes.forEach((hero) => {
           db.run(
             'INSERT OR IGNORE INTO users (username, password, rank, title, identity) VALUES (?, ?, ?, ?, ?)',
-            [hero.cnName, defaultPassword, hero.nickname, hero.nickname, '英雄'],
+            [hero.cnName, defaultPassword, hero.nickname, '', '英雄'],
             function(err) {
               completed++;
               if (err) {
@@ -407,10 +411,20 @@ db.serialize(() => {
               
               if (completed === heroes.length) {
                 console.log(`英雄数据导入完成，共导入 ${inserted} 个英雄`);
+                // 确保所有英雄的头衔为空
+                db.run("UPDATE users SET title = '' WHERE identity = '英雄'", (err) => {
+                  if (err) {
+                    console.error('更新英雄头衔失败:', err);
+                  } else {
+                    console.log('已确保所有英雄头衔为空');
+                  }
+                });
               }
             }
           );
         });
+      }).catch(err => {
+        console.error('生成默认密码失败:', err);
       });
     } else {
       console.log('英雄数据已存在，跳过导入');
@@ -850,13 +864,19 @@ app.get('/api/posts/:id/replies', (req, res) => {
     CASE WHEN r.is_anonymous = 1 THEN '匿名用户' ELSE u.username END as username,
     CASE WHEN r.is_anonymous = 1 THEN 'avatars/default-avatar.png' ELSE u.avatar END as avatar,
     CASE WHEN r.is_anonymous = 1 THEN '坚韧黑铁' ELSE COALESCE(r.user_rank, u.rank, '坚韧黑铁') END as rank,
-    CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_title, u.title, '') END as title,
-    CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_identity, u.identity, '') END as identity,
-    r.likes
+    CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_title, CASE WHEN u.identity = '英雄' THEN '' ELSE u.title END, '') END as title,
+    CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_identity, CASE WHEN u.identity = '英雄' THEN '' ELSE u.identity END, '') END as identity,
+    r.likes,
+    r.parent_reply_id,
+    parent.floor_number as parent_floor_number,
+    CASE WHEN parent.is_anonymous = 1 THEN '匿名用户' ELSE parent_user.username END as parent_username,
+    parent.content as parent_content
     FROM replies r
     LEFT JOIN users u ON r.user_id = u.id
+    LEFT JOIN replies parent ON r.parent_reply_id = parent.id
+    LEFT JOIN users parent_user ON parent.user_id = parent_user.id
     WHERE r.post_id = ?
-    ORDER BY r.sort_order ASC, r.created_at ASC
+    ORDER BY CAST(COALESCE(r.floor_number, 999999) AS INTEGER) ASC, r.sort_order ASC, r.created_at ASC
   `, [postId], (err, replies) => {
     if (err) {
       return res.status(500).json({ error: '获取回复失败' });
@@ -890,6 +910,7 @@ app.post('/api/posts/:id/replies', authenticateToken, async (req, res) => {
     user_identity,
     user_rank,
     floor_number,
+    parent_reply_id,
     images,
     sort_order
   } = req.body;
@@ -901,27 +922,51 @@ app.post('/api/posts/:id/replies', authenticateToken, async (req, res) => {
   const userId = user_id || req.user.id;
   const imagesJson = JSON.stringify(images || []);
 
-  db.run(`INSERT INTO replies (
-    post_id, user_id, content, images, is_anonymous, 
-    custom_time, region, user_title, user_identity, user_rank, floor_number, likes, sort_order
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-    [postId, userId, content, imagesJson, is_anonymous ? 1 : 0, 
-     custom_time, region, user_title, user_identity, user_rank || null, floor_number || null, 0, sort_order || 0], 
-    async function(err) {
-    if (err) {
-      return res.status(500).json({ error: '发布回复失败' });
-    }
+  // 如果没有指定楼层号，自动计算为当前最大楼层号+1
+  if (!floor_number) {
+    db.get('SELECT MAX(floor_number) as max_floor FROM replies WHERE post_id = ?', [postId], (err, result) => {
+      if (err) {
+        console.error('获取最大楼层号失败:', err);
+        return res.status(500).json({ error: '获取最大楼层号失败' });
+      }
+      const maxFloor = result?.max_floor || 0;
+      const finalFloorNumber = maxFloor + 1;
+      
+      // 执行插入
+      insertReply(finalFloorNumber);
+    });
+  } else {
+    insertReply(floor_number);
+  }
 
-    db.get(`
+  function insertReply(finalFloorNumber) {
+    db.run(`INSERT INTO replies (
+      post_id, user_id, content, images, is_anonymous, 
+      custom_time, region, user_title, user_identity, user_rank, floor_number, parent_reply_id, likes, sort_order
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+      [postId, userId, content, imagesJson, is_anonymous ? 1 : 0, 
+       custom_time, region, user_title, user_identity, user_rank || null, finalFloorNumber, parent_reply_id || null, 0, sort_order || 0], 
+      async function(err) {
+      if (err) {
+        return res.status(500).json({ error: '发布回复失败' });
+      }
+
+      db.get(`
       SELECT r.*,
       CASE WHEN r.is_anonymous = 1 THEN '匿名用户' ELSE u.username END as username,
       CASE WHEN r.is_anonymous = 1 THEN 'avatars/default-avatar.png' ELSE u.avatar END as avatar,
-      CASE WHEN r.is_anonymous = 1 THEN 1 ELSE u.rank END as rank,
-      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_title, u.title, '') END as title,
-      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_identity, u.identity, '') END as identity,
-      r.likes
+      CASE WHEN r.is_anonymous = 1 THEN '坚韧黑铁' ELSE COALESCE(r.user_rank, u.rank, '坚韧黑铁') END as rank,
+      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_title, CASE WHEN u.identity = '英雄' THEN '' ELSE u.title END, '') END as title,
+      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_identity, CASE WHEN u.identity = '英雄' THEN '' ELSE u.identity END, '') END as identity,
+      r.likes,
+      r.parent_reply_id,
+      parent.floor_number as parent_floor_number,
+      CASE WHEN parent.is_anonymous = 1 THEN '匿名用户' ELSE parent_user.username END as parent_username,
+      parent.content as parent_content
       FROM replies r
       LEFT JOIN users u ON r.user_id = u.id
+      LEFT JOIN replies parent ON r.parent_reply_id = parent.id
+      LEFT JOIN users parent_user ON parent.user_id = parent_user.id
       WHERE r.id = ?
     `, [this.lastID], (err, reply) => {
       if (err) {
@@ -932,7 +977,8 @@ app.post('/api/posts/:id/replies', authenticateToken, async (req, res) => {
         images: JSON.parse(reply.images || '[]')
       });
     });
-  });
+    });
+  }
 });
 
 // 更新回复（编辑模式）
@@ -940,7 +986,7 @@ app.put('/api/replies/:id', authenticateToken, async (req, res) => {
   const replyId = req.params.id;
   const { 
     content, user_id, is_anonymous, custom_time, region, 
-    user_title, user_identity, user_rank, floor_number, images, likes, sort_order
+    user_title, user_identity, user_rank, floor_number, parent_reply_id, images, likes, sort_order
   } = req.body;
 
   const updates = [];
@@ -955,6 +1001,7 @@ app.put('/api/replies/:id', authenticateToken, async (req, res) => {
   if (user_identity !== undefined) updates.push('user_identity = ?'), values.push(user_identity);
   if (user_rank !== undefined) updates.push('user_rank = ?'), values.push(user_rank);
   if (floor_number !== undefined) updates.push('floor_number = ?'), values.push(floor_number);
+  if (parent_reply_id !== undefined) updates.push('parent_reply_id = ?'), values.push(parent_reply_id || null);
   if (images !== undefined) updates.push('images = ?'), values.push(JSON.stringify(images));
   if (likes !== undefined) updates.push('likes = ?'), values.push(likes);
   if (sort_order !== undefined) updates.push('sort_order = ?'), values.push(sort_order);
@@ -975,10 +1022,16 @@ app.put('/api/replies/:id', authenticateToken, async (req, res) => {
       CASE WHEN r.is_anonymous = 1 THEN '匿名用户' ELSE u.username END as username,
       CASE WHEN r.is_anonymous = 1 THEN 'avatars/default-avatar.png' ELSE u.avatar END as avatar,
       CASE WHEN r.is_anonymous = 1 THEN 1 ELSE u.rank END as rank,
-      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_title, u.title, '') END as title,
-      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_identity, u.identity, '') END as identity
+      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_title, CASE WHEN u.identity = '英雄' THEN '' ELSE u.title END, '') END as title,
+      CASE WHEN r.is_anonymous = 1 THEN '' ELSE COALESCE(r.user_identity, CASE WHEN u.identity = '英雄' THEN '' ELSE u.identity END, '') END as identity,
+      r.parent_reply_id,
+      parent.floor_number as parent_floor_number,
+      CASE WHEN parent.is_anonymous = 1 THEN '匿名用户' ELSE parent_user.username END as parent_username,
+      parent.content as parent_content
       FROM replies r
       LEFT JOIN users u ON r.user_id = u.id
+      LEFT JOIN replies parent ON r.parent_reply_id = parent.id
+      LEFT JOIN users parent_user ON parent.user_id = parent_user.id
       WHERE r.id = ?
     `, [replyId], (err, reply) => {
       if (err) {
@@ -1102,51 +1155,6 @@ app.get('/api/categories/all', (req, res) => {
 // 获取地区列表
 app.get('/api/regions', (req, res) => {
   res.json(REGIONS);
-});
-
-// ============================================
-// 临时数据上传端点（上传完成后记得删除）
-// ============================================
-const { exec } = require('child_process');
-const execAsync = promisify(exec);
-
-// 数据目录路径（Fly.io 使用持久化存储，本地使用当前目录）
-const dataDir = process.env.FLY_VOLUME_PATH || './data';
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-app.post('/api/admin/upload-data', multer({ 
-  dest: `${dataDir}/`,
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB 限制
-}).single('datafile'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: '没有上传文件' });
-  }
-
-  const uploadedFile = req.file.path;
-  const targetDir = dataDir;
-
-  try {
-    // 解压数据包
-    console.log(`开始解压数据包: ${uploadedFile}`);
-    const { stdout, stderr } = await execAsync(`cd ${targetDir} && tar -xzf ${uploadedFile} && rm ${uploadedFile}`);
-    
-    if (stderr && !stderr.includes('Removing leading')) {
-      console.error('解压警告:', stderr);
-    }
-    
-    console.log('数据解压成功');
-    res.json({ 
-      message: '数据上传并解压成功',
-      extracted: true
-    });
-  } catch (error) {
-    console.error('解压失败:', error);
-    res.status(500).json({ 
-      error: '解压失败: ' + error.message 
-    });
-  }
 });
 
 app.listen(PORT, () => {
