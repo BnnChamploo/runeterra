@@ -206,9 +206,10 @@ function getDefaultAvatarUrls(username) {
   const urls = [];
   
   // 默认头像始终从前端静态资源获取（public/avatar/）
-  // 在生产环境，路径是 /runeterra/avatar/（GitHub Pages 子路径）
-  // 在开发环境，路径是 /avatar/
-  const basePath = '/avatar';  // 始终使用相对路径，Vite 会自动处理 GitHub Pages 的 base 路径
+  // 使用 Vite 的 BASE_URL 确保包含 base 配置（/runeterra/）
+  // import.meta.env.BASE_URL 在生产环境是 '/runeterra/'，开发环境是 '/'
+  const baseUrl = typeof import !== 'undefined' && import.meta?.env?.BASE_URL || '/';
+  const basePath = `${baseUrl}avatar`.replace(/\/+/g, '/');  // 确保路径正确拼接，移除多余的斜杠
   
   for (const name of names) {
     for (const ext of IMAGE_EXTENSIONS) {
@@ -237,7 +238,9 @@ export function getAvatarUrl(avatar, username) {
   const defaultUrls = getDefaultAvatarUrls(username);
   // 返回第一个可能的URL，让浏览器尝试加载
   // 如果第一个失败，会在 onError 中处理
-  return defaultUrls[0] || '/avatar/default.jpg';
+  const baseUrl = typeof import !== 'undefined' && import.meta?.env?.BASE_URL || '/';
+  const defaultFallback = `${baseUrl}avatar/default.jpg`.replace(/\/+/g, '/');
+  return defaultUrls[0] || defaultFallback;
 }
 
 /**
