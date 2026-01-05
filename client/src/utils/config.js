@@ -1,7 +1,11 @@
 // 统一配置管理
 // 生产环境默认使用 Fly.io 后端
+// 判断是否为生产环境：不是开发服务器（没有 Vite 的 HMR）或者明确设置了生产模式
+const isProduction = import.meta.env.PROD || 
+  (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1'));
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? 'https://runeterra-api.fly.dev' : '');
+  (isProduction ? 'https://runeterra-api.fly.dev' : '');
 const UPLOAD_BASE_URL = import.meta.env.VITE_UPLOAD_BASE_URL || 
   (API_BASE_URL ? `${API_BASE_URL}/uploads` : '/uploads');
 

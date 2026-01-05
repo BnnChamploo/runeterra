@@ -25,32 +25,32 @@ const uploadsBasePath = process.env.FLY_VOLUME_PATH
   : 'uploads';
 
 // 中间件
-// CORS 配置：允许 GitHub Pages 和本地开发
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.GITHUB_PAGES_URL,
-  'http://localhost:3000',
-  'http://localhost:5173'
-].filter(Boolean);
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // 允许没有 origin 的请求（如移动应用或 Postman）
-    if (!origin) return callback(null, true);
-    // 允许配置的域名
-    if (allowedOrigins.includes(origin) || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
-      callback(null, true);
-    } else {
-      // 开发环境允许所有来源
-      if (process.env.NODE_ENV !== 'production') {
+// CORS 配置：开发环境允许所有来源，生产环境只允许配置的域名
+if (process.env.NODE_ENV === 'production') {
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.GITHUB_PAGES_URL,
+    'https://BnnChamploo.github.io',
+    'https://BnnChamploo.github.io/runeterra'
+  ].filter(Boolean);
+  
+  app.use(cors({
+    origin: function (origin, callback) {
+      // 允许没有 origin 的请求
+      if (!origin) return callback(null, true);
+      // 允许配置的域名
+      if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
       }
-    }
-  },
-  credentials: true
-}));
+    },
+    credentials: true
+  }));
+} else {
+  // 开发环境允许所有来源
+  app.use(cors());
+}
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(uploadsBasePath));
@@ -1110,8 +1110,14 @@ app.get('/api/regions', (req, res) => {
 const { exec } = require('child_process');
 const execAsync = promisify(exec);
 
+// 数据目录路径（Fly.io 使用持久化存储，本地使用当前目录）
+const dataDir = process.env.FLY_VOLUME_PATH || './data';
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
 app.post('/api/admin/upload-data', multer({ 
-  dest: '/app/data/',
+  dest: `${dataDir}/`,
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB 限制
 }).single('datafile'), async (req, res) => {
   if (!req.file) {
@@ -1119,7 +1125,7 @@ app.post('/api/admin/upload-data', multer({
   }
 
   const uploadedFile = req.file.path;
-  const targetDir = '/app/data';
+  const targetDir = dataDir;
 
   try {
     // 解压数据包
