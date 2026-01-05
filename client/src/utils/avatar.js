@@ -267,8 +267,9 @@ export function createAvatarErrorHandler(username, initialAvatar) {
     // 初始化或获取当前尝试的索引
     let currentIndex = parseInt(img.dataset.avatarRetryIndex) || -1;
     
-    // 如果初始头像是服务器路径（数据库中的头像），开始尝试默认头像列表
-    if (initialAvatar && (initialAvatar.includes('localhost:3001') || initialAvatar.includes('/uploads/')) && currentIndex === -1) {
+    // 如果初始头像是服务器路径（数据库中的头像），开始尝试默认头像列表（前端静态资源）
+    const API_BASE_URL = getApiBaseUrl();
+    if (initialAvatar && (initialAvatar.includes('localhost:3001') || initialAvatar.includes('/uploads/') || (API_BASE_URL && initialAvatar.includes(API_BASE_URL))) && currentIndex === -1) {
       if (defaultUrls.length > 0) {
         currentIndex = 0;
         img.dataset.avatarRetryIndex = '0';
