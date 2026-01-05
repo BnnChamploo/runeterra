@@ -199,21 +199,20 @@ function getPossibleAvatarNames(username) {
 
 /**
  * 生成默认头像URL列表（按优先级排序）
+ * 默认头像始终从前端静态资源获取（/avatar/），不依赖后端
  */
 function getDefaultAvatarUrls(username) {
   const names = getPossibleAvatarNames(username);
   const urls = [];
   
-  // 在生产环境，默认头像应该从后端服务器获取
-  // 在开发环境，使用相对路径（指向 public/avatar/）
-  const API_BASE_URL = getApiBaseUrl();
-  const avatarBasePath = API_BASE_URL 
-    ? `${API_BASE_URL}/uploads/avatars`  // 生产环境：从后端获取
-    : '/avatar';  // 开发环境：从 public/avatar/ 获取
+  // 默认头像始终从前端静态资源获取（public/avatar/）
+  // 在生产环境，路径是 /runeterra/avatar/（GitHub Pages 子路径）
+  // 在开发环境，路径是 /avatar/
+  const basePath = '/avatar';  // 始终使用相对路径，Vite 会自动处理 GitHub Pages 的 base 路径
   
   for (const name of names) {
     for (const ext of IMAGE_EXTENSIONS) {
-      urls.push(`${avatarBasePath}/${name}.${ext}`);
+      urls.push(`${basePath}/${name}.${ext}`);
     }
   }
   
@@ -229,20 +228,16 @@ function getDefaultAvatarUrls(username) {
 import { getUploadUrl, getApiBaseUrl } from './config';
 
 export function getAvatarUrl(avatar, username) {
-  // 如果数据库中有头像且不是默认头像，使用数据库中的头像
+  // 如果数据库中有头像且不是默认头像，使用数据库中的头像（从后端获取）
   if (avatar && avatar !== 'avatars/default-avatar.png' && avatar !== '') {
     return getUploadUrl(avatar);
   }
   
-  // 否则，尝试使用默认头像
+  // 否则，尝试使用默认头像（从前端静态资源获取）
   const defaultUrls = getDefaultAvatarUrls(username);
   // 返回第一个可能的URL，让浏览器尝试加载
   // 如果第一个失败，会在 onError 中处理
-  const API_BASE_URL = getApiBaseUrl();
-  const defaultFallback = API_BASE_URL 
-    ? `${API_BASE_URL}/uploads/avatars/default.jpg`
-    : '/avatar/default.jpg';
-  return defaultUrls[0] || defaultFallback;
+  return defaultUrls[0] || '/avatar/default.jpg';
 }
 
 /**
