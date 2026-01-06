@@ -763,8 +763,8 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
       CASE WHEN p.is_anonymous = 1 THEN '匿名用户' ELSE u.username END as username,
       CASE WHEN p.is_anonymous = 1 THEN 'avatars/default-avatar.png' ELSE u.avatar END as avatar,
       CASE WHEN p.is_anonymous = 1 THEN 1 ELSE u.rank END as rank,
-      CASE WHEN p.is_anonymous = 1 THEN '' ELSE COALESCE(p.user_title, u.title, '') END as title,
-      CASE WHEN p.is_anonymous = 1 THEN '' ELSE COALESCE(p.user_identity, u.identity, '') END as identity
+      CASE WHEN p.is_anonymous = 1 THEN '' ELSE COALESCE(p.user_title, CASE WHEN u.identity = '英雄' THEN '' ELSE u.title END, '') END as title,
+      CASE WHEN p.is_anonymous = 1 THEN '' ELSE COALESCE(p.user_identity, CASE WHEN u.identity = '英雄' THEN '' ELSE u.identity END, '') END as identity
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       WHERE p.id = ?
