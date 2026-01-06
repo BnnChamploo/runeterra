@@ -213,7 +213,8 @@ function getDefaultAvatarUrls(username) {
   
   for (const name of names) {
     for (const ext of IMAGE_EXTENSIONS) {
-      // URL编码文件名，确保中文字符正确传输
+      // 使用 encodeURIComponent 确保中文文件名正确编码
+      // 但只编码文件名部分，不编码路径分隔符
       const encodedName = encodeURIComponent(name);
       urls.push(`${basePath}/${encodedName}.${ext}`);
     }
