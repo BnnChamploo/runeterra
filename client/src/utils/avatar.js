@@ -293,13 +293,18 @@ export function createAvatarErrorHandler(username, initialAvatar) {
       }
     }
     
-    // 如果初始头像是默认头像路径（/avatar/开头或包含/avatars/），找到当前URL在列表中的位置
+    // 如果初始头像是默认头像路径（/avatar/开头或包含/runeterra/avatar/），找到当前URL在列表中的位置
+    // 注意：URL 中的文件名是编码后的，需要正确比较
     const isDefaultAvatarPath = initialAvatar && (
-      initialAvatar.startsWith('/avatar/') || 
-      (API_BASE_URL && initialAvatar.includes('/avatars/'))
+      initialAvatar.includes('/avatar/') || 
+      initialAvatar.includes('/runeterra/avatar/')
     );
     if (isDefaultAvatarPath && currentIndex === -1) {
-      const initialIndex = defaultUrls.indexOf(initialAvatar);
+      // 找到当前 URL 在列表中的位置（需要匹配编码后的 URL）
+      const initialIndex = defaultUrls.findIndex(url => {
+        // 比较时需要考虑 URL 可能已经被浏览器解码或编码
+        return url === initialAvatar || decodeURIComponent(url) === decodeURIComponent(initialAvatar);
+      });
       if (initialIndex >= 0 && initialIndex < defaultUrls.length - 1) {
         currentIndex = initialIndex + 1;
         img.dataset.avatarRetryIndex = String(currentIndex);
