@@ -116,7 +116,7 @@ const Home = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pr-[calc(1rem+96px)] sm:pr-[calc(1.5rem+96px)] lg:pr-[calc(2rem+96px)]">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-8">
         <div className="mb-6">
         <h1 className="text-3xl font-bold text-runeterra-gold mb-2">
           {category ? getCategoryName(category) : '最新帖子'}
@@ -145,6 +145,7 @@ const Home = () => {
               key={post.id}
               to={`/post/${post.id}`}
               className="block w-full theme-card rounded-lg p-4 md:p-6 transition-colors border border-runeterra-gold/20 hover:border-runeterra-gold/40"
+  
             >
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
