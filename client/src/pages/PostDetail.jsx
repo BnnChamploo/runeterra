@@ -413,6 +413,18 @@ const PostDetail = ({ user }) => {
     fetchRegions();
   }, [id]);
 
+  // 监听编辑模式变化事件，避免页面重新加载
+  useEffect(() => {
+    const handleEditModeChange = (event) => {
+      setIsEditMode(event.detail.isEditMode);
+    };
+
+    window.addEventListener('editModeChanged', handleEditModeChange);
+    return () => {
+      window.removeEventListener('editModeChanged', handleEditModeChange);
+    };
+  }, []);
+
   const fetchPost = async () => {
     try {
       const response = await api.get(`/posts/${id}`);

@@ -284,7 +284,10 @@ const Navbar = ({ user, onLogout }) => {
                     onClick={() => {
                       const isEditMode = localStorage.getItem('editMode') === 'true';
                       localStorage.setItem('editMode', (!isEditMode).toString());
-                      window.location.reload();
+                      // 发送自定义事件通知组件更新，而不是重新加载页面
+                      window.dispatchEvent(new CustomEvent('editModeChanged', {
+                        detail: { isEditMode: !isEditMode }
+                      }));
                     }}
                     className={`px-3 py-2 rounded-md transition-colors font-medium text-sm ${
                       localStorage.getItem('editMode') === 'true'
@@ -486,7 +489,10 @@ const Navbar = ({ user, onLogout }) => {
                         checked={localStorage.getItem('editMode') === 'true'}
                         onChange={(e) => {
                           localStorage.setItem('editMode', e.target.checked.toString());
-                          window.location.reload();
+                          // 发送自定义事件通知组件更新，而不是重新加载页面
+                          window.dispatchEvent(new CustomEvent('editModeChanged', {
+                            detail: { isEditMode: e.target.checked }
+                          }));
                         }}
                         className="sr-only peer"
                       />
